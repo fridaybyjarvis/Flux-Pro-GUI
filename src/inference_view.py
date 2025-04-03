@@ -3,12 +3,12 @@ import gradio as gr
 from config import MAX_SEED
 
 
-def create_inference_view():
+def create_inference_view(model_state: gr.State):
     with gr.Blocks() as inference_view:
         with gr.Row():
             with gr.Column(variant="panel", scale=1) as settings_column:
                 gr.Markdown("# Settings")
-                with gr.Blocks() as main_settings:
+                with gr.Column() as main_settings:
                     gr.Markdown("## Main settings")
                     with gr.Row():
                         width_input = gr.Number(
@@ -70,7 +70,7 @@ def create_inference_view():
                         interactive=True,
                     )
 
-                with gr.Blocks() as finetuning_settings:
+                with gr.Column() as finetune_settings:
                     gr.Markdown("## Finetune settings")
                     finetune_id_input = gr.Text(
                         label="Finetune ID",
@@ -105,7 +105,7 @@ def create_inference_view():
                         outputs=interval_input,
                     )
 
-                with gr.Blocks() as ultra_settings:
+                with gr.Column(visible=False) as ultra_settings:
                     gr.Markdown("## Ultra model settings")
                     use_raw_mode_input = gr.Checkbox(
                         label="Use raw mode",
@@ -132,8 +132,32 @@ def create_inference_view():
                     )
                     generate_button = gr.Button(value="Generate", variant="primary")
                 ip_input = gr.Image(
-                    label="Image prompt",
+                    label="Image prompt (Redux)",
                     interactive=True,
                     sources=["upload", "clipboard"],
                 )
+
+    # Show Ultra settings iff the model is Flux Pro 1.1 Ultra
+    model_state.change(
+        lambda x: gr.update(visible=(x == "Flux Pro 1.1 Ultra")),
+        model_state,
+        ultra_settings,
+    )
+    # Hide guidance scale and interval when model isn't Flux.1 Pro
+    model_state.change(
+        lambda x: gr.update(visible=(x == "Flux.1 Pro")),
+        model_state,
+        guidance_input,
+    )
+    model_state.change(
+        lambda x: gr.update(visible=(x == "Flux.1 Pro")),
+        model_state,
+        interval_input,
+    )
+    # Hide finetune settings when using Flux Pro 1.1
+    model_state.change(
+        lambda x: gr.update(visible=(x != "Flux Pro 1.1")),
+        model_state,
+        finetune_settings,
+    )
     return inference_view

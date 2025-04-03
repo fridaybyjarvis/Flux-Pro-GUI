@@ -15,12 +15,14 @@ css = """
 with gr.Blocks(css=css) as demo:
     gr.Markdown("# Flux Pro GUI")
     with gr.Row():
+        model_state = gr.State(list(AVAILABLE_MODELS.keys())[0])
         model_input = gr.Dropdown(
             label="Model",
             info="Please note that finetuning is not available for Flux 1.1 Pro",
             choices=AVAILABLE_MODELS.keys(),
             interactive=True,
         )
+        model_input.change(lambda x: x, model_input, model_state)
         api_key_input = gr.Textbox(
             label="API key",
             info="Get your BFL API key at https://docs.bfl.ml/",
@@ -29,11 +31,12 @@ with gr.Blocks(css=css) as demo:
             type="password",
             scale=4,
         )
+
     with gr.Tabs():
         with gr.Tab(label="Inference"):
-            create_inference_view()
+            create_inference_view(model_state)
         with gr.Tab(label="Finetuning"):
-            create_finetuning_view()
+            create_finetuning_view(model_state)
 
 
 if __name__ == "__main__":
