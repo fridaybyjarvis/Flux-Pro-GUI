@@ -34,9 +34,9 @@ with gr.Blocks(css=css) as demo:
 
     with gr.Tabs():
         with gr.Tab(label="Inference", id="inference_tab"):
-            create_inference_view(model_state)
+            create_inference_view(model_state, api_key_input)
         with gr.Tab(label="Finetuning", id="finetuning_tab"):
-            create_finetuning_view(model_state)
+            create_finetuning_view(model_state, api_key_input)
 
 
 if __name__ == "__main__":

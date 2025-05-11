@@ -1,9 +1,10 @@
 import gradio as gr
+from config import MAX_SEED, AVAILABLE_MODELS
+from api_utils import generate_image
+import bfl_finetune
 
-from config import MAX_SEED
 
-
-def create_inference_view(model_state: gr.State):
+def create_inference_view(model_state: gr.State, api_key_input: gr.Textbox):
     with gr.Blocks() as inference_view:
         with gr.Row():
             with gr.Column(variant="panel", scale=1) as settings_column:
@@ -72,8 +73,10 @@ def create_inference_view(model_state: gr.State):
 
                 with gr.Column() as finetune_settings:
                     gr.Markdown("## Finetune settings")
+                    refresh_finetunes_btn = gr.Button("Refresh Finetunes")
+                    finetune_dropdown = gr.Dropdown(label="Select Finetune", choices=[], interactive=True)
                     finetune_id_input = gr.Text(
-                        label="Finetune ID",
+                        label="Finetune ID (auto-filled from dropdown, or enter manually)",
                         info="Leave empty to use base model. Go the the finetuning tab to see your finetunes and create new ones.",
                         value=None,
                         interactive=True,
@@ -87,6 +90,7 @@ def create_inference_view(model_state: gr.State):
                         interactive=True,
                         visible=False,
                     )
+                    finetune_error_box = gr.Textbox(label="Finetune Error", value="", interactive=False, visible=True)
 
                     def show_element_if_not_empty(s: str):
                         return gr.update(visible=bool(s.strip()))
@@ -103,6 +107,31 @@ def create_inference_view(model_state: gr.State):
                         show_element_if_empty,
                         inputs=finetune_id_input,
                         outputs=interval_input,
+                    )
+
+                    # When a dropdown value is selected, update the finetune_id_input
+                    def set_finetune_id(selected_id):
+                        return selected_id
+                    finetune_dropdown.change(set_finetune_id, inputs=finetune_dropdown, outputs=finetune_id_input)
+
+                    # Populate the dropdown with available finetunes
+                    def get_finetune_choices(api_key):
+                        try:
+                            resp = bfl_finetune.finetune_list(api_key=api_key)
+                            if not isinstance(resp, dict) or "finetunes" not in resp:
+                                return [], f"Error: {resp}"
+                            return [item.get("id", "") if isinstance(item, dict) else item for item in resp.get("finetunes", [])], ""
+                        except Exception as e:
+                            return [], f"Error: {e}"
+
+                    def update_dropdown_and_clear(selected_choices, error_msg):
+                        # If there are choices, set the value to the first one; otherwise, clear the value
+                        return gr.update(choices=selected_choices, value=selected_choices[0] if selected_choices else None), error_msg
+
+                    refresh_finetunes_btn.click(
+                        lambda api_key: update_dropdown_and_clear(*get_finetune_choices(api_key)),
+                        inputs=[api_key_input],
+                        outputs=[finetune_dropdown, finetune_error_box]
                     )
 
                 with gr.Column(visible=False) as ultra_settings:
@@ -136,6 +165,70 @@ def create_inference_view(model_state: gr.State):
                     interactive=True,
                     sources=["upload", "clipboard"],
                 )
+
+        def generate_images(
+            model_name,
+            api_key,
+            prompt,
+            width,
+            height,
+            steps,
+            guidance_scale,
+            seed,
+            image_prompt,
+            finetune_id,
+            finetune_strength,
+            use_raw_mode,
+            prompt_upsample,
+            interval
+        ):
+            if not api_key:
+                raise gr.Error("Please enter your API key")
+            if not prompt:
+                raise gr.Error("Please enter a prompt")
+
+            try:
+                model_id = AVAILABLE_MODELS[model_name]
+                images = generate_image(
+                    api_key=api_key,
+                    model_id=model_id,
+                    prompt=prompt,
+                    width=width,
+                    height=height,
+                    steps=steps,
+                    guidance_scale=guidance_scale,
+                    seed=seed,
+                    image_prompt=image_prompt,
+                    finetune_id=finetune_id,
+                    finetune_strength=finetune_strength,
+                    use_raw_mode=use_raw_mode,
+                    prompt_upsample=prompt_upsample,
+                    interval=interval
+                )
+                return [(img, f"Generated image {i+1}") for i, img in enumerate(images)]
+            except Exception as e:
+                raise gr.Error(f"Failed to generate images: {str(e)}")
+
+        generate_button.click(
+            fn=generate_images,
+            inputs=[
+                model_state,
+                api_key_input,
+                prompt_input,
+                width_input,
+                height_input,
+                steps_input,
+                guidance_input,
+                seed_input,
+                ip_input,
+                finetune_id_input,
+                finetune_strength_input,
+                use_raw_mode_input,
+                prompt_upsample_input,
+                interval_input,
+            ],
+            outputs=infer_gallery,
+        )
 
     # Show Ultra settings iff the model is Flux Pro 1.1 Ultra
     model_state.change(

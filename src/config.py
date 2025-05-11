@@ -4,6 +4,7 @@ AVAILABLE_MODELS = {
     "Flux.1 Pro": "flux-pro",
     "Flux Pro 1.1": "flux-pro-1.1",
     "Flux Pro 1.1 Ultra": "flux-pro-1.1-ultra",
+    "Flux1 Pro Finetune": "flux-pro-finetuned",
 }
 # Auto-captioning modes for the finetuning endpoint
 CAPTIONING_MODES = {
